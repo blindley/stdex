@@ -31,11 +31,13 @@ macro_rules! mersenne_twister_impl {
                 }
 
                 self.twist();
+                self.index = 0;
             }
 
             pub fn generate(&mut self) -> $out_type {
                 if self.index >= $n {
                     self.twist();
+                    self.index = 0;
                 }
 
                 let mut x = self.state[self.index];
@@ -47,6 +49,20 @@ macro_rules! mersenne_twister_impl {
                 x ^=  x >> $l;
 
                 x
+            }
+
+            pub fn skip(&mut self, mut skip_count: usize) {
+                while skip_count >= $n {
+                    self.twist();
+                    skip_count -= $n;
+                }
+
+                self.index += skip_count;
+
+                if self.index >= $n {
+                    self.twist();
+                    self.index -= $n;
+                }
             }
 
             fn twist(&mut self) {
@@ -73,7 +89,6 @@ macro_rules! mersenne_twister_impl {
 
                 let bits = (self.state[i] & UMASK) | (self.state[0] & LMASK);
                 self.state[i] = self.state[$m - 1] ^ (bits >> 1) ^ ((bits & 1) * $a);
-                self.index = 0;
             }
         }
     };
@@ -156,11 +171,8 @@ mod tests {
         {
             let mut gen32 = super::MT19937_32::new();
             let mut gen64 = super::MT19937_64::new();
-            for _ in 0..9999 {
-                gen32.generate();
-                gen64.generate();
-            }
-
+            gen32.skip(9999);
+            gen64.skip(9999);
             assert_eq!(gen32.generate(), 4123659995);
             assert_eq!(gen64.generate(), 9981545732273789042);
         }

@@ -2,4 +2,4 @@
 **/*.rs.bk
 Cargo.lock
 
-examples/scratch.rs
+examples/scratch*.rs

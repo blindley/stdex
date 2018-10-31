@@ -1,5 +1,5 @@
 
-macro_rules! impl_bitstring {
+macro_rules! impl_compact_bitstring {
     ($name:ident, $type:ty, $len:expr) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
         pub struct $name(pub $type);
@@ -101,11 +101,11 @@ macro_rules! impl_bitstring {
     };
 }
 
-impl_bitstring!(BitString5, u8, 5);
-impl_bitstring!(BitString12, u16, 12);
-impl_bitstring!(BitString27, u32, 27);
-impl_bitstring!(BitString58, u64, 58);
-impl_bitstring!(BitString121, u128, 121);
+impl_compact_bitstring!(CompactBitString5, u8, 5);
+impl_compact_bitstring!(CompactBitString12, u16, 12);
+impl_compact_bitstring!(CompactBitString27, u32, 27);
+impl_compact_bitstring!(CompactBitString58, u64, 58);
+impl_compact_bitstring!(CompactBitString121, u128, 121);
 
 macro_rules! impl_from {
     ($from:ty, $into:ident, $into_t:ty) => {
@@ -121,23 +121,20 @@ macro_rules! impl_from {
     };
 }
 
-impl_from!(BitString5, BitString12, u16);
-impl_from!(BitString5, BitString27, u32);
-impl_from!(BitString5, BitString58, u64);
-impl_from!(BitString5, BitString121, u128);
-
-impl_from!(BitString12, BitString27, u32);
-impl_from!(BitString12, BitString58, u64);
-impl_from!(BitString12, BitString121, u128);
-
-impl_from!(BitString27, BitString58, u64);
-impl_from!(BitString27, BitString121, u128);
-
-impl_from!(BitString58, BitString121, u128);
+impl_from!(CompactBitString5, CompactBitString12, u16);
+impl_from!(CompactBitString5, CompactBitString27, u32);
+impl_from!(CompactBitString5, CompactBitString58, u64);
+impl_from!(CompactBitString5, CompactBitString121, u128);
+impl_from!(CompactBitString12, CompactBitString27, u32);
+impl_from!(CompactBitString12, CompactBitString58, u64);
+impl_from!(CompactBitString12, CompactBitString121, u128);
+impl_from!(CompactBitString27, CompactBitString58, u64);
+impl_from!(CompactBitString27, CompactBitString121, u128);
+impl_from!(CompactBitString58, CompactBitString121, u128);
 
 mod tests {
     #![allow(unused_imports, overflowing_literals)]
-    use super::{BitString12, BitString121, BitString27, BitString5, BitString58};
+    use super::*;
 
     macro_rules! impl_tests {
         ($tname:ident, $name:ident, $type:ty, $len:expr) => {
@@ -189,16 +186,16 @@ mod tests {
         };
     }
     
-    impl_tests!(test_bitstring5, BitString5, u8, 5);
-    impl_tests!(test_bitstring12, BitString12, u16, 12);
-    impl_tests!(test_bitstring27, BitString27, u32, 27);
-    impl_tests!(test_bitstring58, BitString58, u64, 58);
-    impl_tests!(test_bitstring121, BitString121, u128, 121);
+    impl_tests!(test_bitstring5, CompactBitString5, u8, 5);
+    impl_tests!(test_bitstring12, CompactBitString12, u16, 12);
+    impl_tests!(test_bitstring27, CompactBitString27, u32, 27);
+    impl_tests!(test_bitstring58, CompactBitString58, u64, 58);
+    impl_tests!(test_bitstring121, CompactBitString121, u128, 121);
 
     #[test]
     fn a_few_more_tests() {
         let mut bits = 0x102030405060708090a0b0c0d0e0f0;
-        let mut b = BitString121::from_len_and_bits(120, bits);
+        let mut b = CompactBitString121::from_len_and_bits(120, bits);
         assert_eq!(b.len(), 120);
         assert_eq!(b.bits(), bits);
 

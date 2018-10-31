@@ -28,6 +28,10 @@ pub trait Rng64 {
     fn generate_u64(&mut self) -> u64;
 }
 
+/// Generate a `u32` uniformly distributed across the range `[0, max_value]`
+/// 
+/// Uniformity is contingent upon the uniformity of `eng` across
+/// `[0, std::u32::MAX]`
 pub fn generate_uniform_u32(eng: &mut impl Rng32, max_value: u32) -> u32 {
     const ENGINE_MAX: u32 = std::u32::MAX;
     if max_value == 0 {
@@ -45,6 +49,10 @@ pub fn generate_uniform_u32(eng: &mut impl Rng32, max_value: u32) -> u32 {
     }
 }
 
+/// Generate a `u64` uniformly distributed across the range `[0, max_value]`
+/// 
+/// Uniformity is contingent upon the uniformity of `eng` across
+/// `[0, std::u64::MAX]`
 pub fn generate_uniform_u64(eng: &mut impl Rng64, max_value: u64) -> u64 {
     const ENGINE_MAX: u64 = std::u64::MAX;
     if max_value == 0 {
@@ -59,5 +67,25 @@ pub fn generate_uniform_u64(eng: &mut impl Rng64, max_value: u64) -> u64 {
                 break result;
             }
         }
+    }
+}
+
+/// Generate an `f32` in the range `[0,1)`
+pub fn generate_canonical_f32(eng: &mut impl Rng32) -> f32 {
+    let result = (eng.generate_u32() as f32) / (std::u32::MAX as f32);
+    if result == 1.0 {
+        result - std::f32::EPSILON / 2.0
+    } else {
+        result
+    }
+}
+
+/// Generate an `f64` in the range `[0,1)`
+pub fn generate_canonical_f64(eng: &mut impl Rng64) -> f64 {
+    let result = (eng.generate_u64() as f64) / (std::u64::MAX as f64);
+    if result == 1.0 {
+        result - std::f64::EPSILON / 2.0
+    } else {
+        result
     }
 }

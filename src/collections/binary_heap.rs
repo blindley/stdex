@@ -41,6 +41,10 @@ impl<T,C> BinaryHeap<T,C> {
         self.data.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.len() == 0
+    }
+
     // Push an item onth the heap.
     pub fn push(&mut self, value: T)
     where C: Compare<T> {

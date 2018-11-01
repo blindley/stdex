@@ -1,101 +1,97 @@
+pub trait BitString {
+    const MAX_LEN: usize;
+    type BitsType;
+    fn new(len: usize, bits: Self::BitsType) -> Self;
+    fn len(&self) -> usize;
+    fn bits(&self) -> Self::BitsType;
+    fn push_bit_back(&mut self, bit: u8);
+    fn push_bit_front(&mut self, bit: u8);
+    fn pop_bit_back(&mut self) -> u8;
+    fn pop_bit_front(&mut self) -> u8;
+    fn append(&mut self, other: Self);
+    fn prepend(&mut self, other: Self);
+    fn clear(&mut self);
+}
+
+/// A BitString that can hold at least 8 bits
+pub trait BitString8: BitString {
+    fn push_u8_back(&mut self, byte: u8);
+    fn push_u8_front(&mut self, byte: u8);
+    fn pop_u8_back(&mut self) -> u8;
+    fn pop_u8_front(&mut self) -> u8;
+}
 
 macro_rules! impl_compact_bitstring {
-    ($name:ident, $type:ty, $len:expr) => {
+    ($name:ident, $base:ty, $maxlen:expr) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-        pub struct $name(pub $type);
+        pub struct $name($base);
 
-        impl $name {
-            const MAX_LEN: usize = $len;
-            const BITS_MASK: $type = (1 << $len) - 1;
-            const LEN_MASK: $type = !$name::BITS_MASK;
-            const LEN_ONE: $type = 1 << $len;
-
-            pub fn new() -> $name { $name(0) }
-            pub fn from_len_and_bits(len: usize, bits: $type) -> $name {
-                $name(((len as $type) << $len) | bits)
+        impl BitString for $name {
+            const MAX_LEN: usize = $maxlen;
+            type BitsType = $base;
+            fn new(len: usize, bits: Self::BitsType) -> Self {
+                $name(((len as Self::BitsType) << Self::MAX_LEN) | (bits & ((1 << len) - 1)))
             }
-            pub fn len(&self) -> usize { (self.0 >> $len) as usize }
-            pub fn bits(&self) -> $type { self.0 & $name::BITS_MASK }
-            pub fn push_bit(&mut self, bit: u8) {
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) + $name::LEN_ONE) |
-                    ((self.0 << 1) & $name::BITS_MASK | (bit as $type));
+            fn len(&self) -> usize { (self.0 >> Self::MAX_LEN) as usize }
+            fn bits(&self) -> Self::BitsType { self.0 & ((1 << Self::MAX_LEN) - 1) }
+
+            fn push_bit_back(&mut self, bit: u8) {
+                let len = self.len();
+                let new_bits = (self.bits() << 1) | (bit as Self::BitsType);
+                *self = Self::new(len + 1, new_bits);
             }
 
-            pub fn push_bit_front(&mut self, bit: u8) {
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) + $name::LEN_ONE) |
-                    (self.bits() | ((bit as $type) << self.len()))
+            fn push_bit_front(&mut self, bit: u8) {
+                let len = self.len();
+                let new_bits = ((bit as Self::BitsType) << len) | self.bits();
+                *self = Self::new(len + 1, new_bits);
             }
 
-            pub fn append(&mut self, other: $name) {
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) + (other.0 & $name::LEN_MASK)) |
-                    ((self.0 << other.len()) & $name::BITS_MASK | other.bits())
-            }
-
-            pub fn prepend(&mut self, other: $name) {
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) + (other.0 & $name::LEN_MASK)) |
-                    (self.bits() | (other.bits() << self.len()))
-            }
-
-            pub fn pop_bit(&mut self) -> u8 {
-                let result = (self.0 & 1) as u8;
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) - $name::LEN_ONE) |
-                    (self.bits() >> 1);
+            fn pop_bit_back(&mut self) -> u8 {
+                let result = (self.0 as u8) & 1;
+                let len = self.len();
+                let new_bits = self.bits() >> 1;
+                *self = Self::new(len - 1, new_bits);
                 result
             }
 
-            pub fn pop_bit_front(&mut self) -> u8 {
+            fn pop_bit_front(&mut self) -> u8 {
                 let new_len = self.len() - 1;
-                let result = ((self.0 >> new_len) & 1) as u8;
-                self.0 =
-                    ((self.0 & $name::LEN_MASK) - $name::LEN_ONE) |
-                    (self.bits() & ((1 << new_len) - 1));
+                let result = ((self.0 >> new_len) as u8) & 1;
+                let new_bits = self.bits() & ((1 << new_len) - 1);
+                *self = Self::new(new_len, new_bits);
                 result
+            }
+
+            fn append(&mut self, other: Self) {
+                let new_len = self.len() + other.len();
+                let new_bits = (self.bits() << other.len()) | other.bits();
+                *self = Self::new(new_len, new_bits);
+            }
+
+            fn prepend(&mut self, other: Self) {
+                let new_len = self.len() + other.len();
+                let new_bits = (other.bits() << self.len()) | self.bits();
+                *self = Self::new(new_len, new_bits);
+            }
+
+            fn clear(&mut self) {
+                self.0 = 0;
             }
         }
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                let mut buffer: [u8;$len] = unsafe { std::mem::uninitialized() };
+                let mut buffer: [u8;Self::MAX_LEN] = unsafe { std::mem::uninitialized() };
                 let len = self.len();
-                assert!(len <= $len);
                 let mut bits = self.bits();
                 for i in 0..len {
-                    buffer[len - i - 1] = b'0' + (bits as u8 & 1);
+                    buffer[len - i - 1] = (bits as u8 & 1) + b'0';
                     bits >>= 1;
                 }
 
                 let s = unsafe { std::str::from_utf8_unchecked(&buffer[..len]) };
-
                 f.write_str(s)
-            }
-        }
-
-        impl std::fmt::Binary for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{:b}", self.bits())
-            }
-        }
-
-        impl std::fmt::LowerHex for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{:x}", self.bits())
-            }
-        }
-
-        impl std::fmt::UpperHex for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{:X}", self.bits())
-            }
-        }
-
-        impl std::fmt::Octal for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{:o}", self.bits())
             }
         }
     };
@@ -107,104 +103,116 @@ impl_compact_bitstring!(CompactBitString27, u32, 27);
 impl_compact_bitstring!(CompactBitString58, u64, 58);
 impl_compact_bitstring!(CompactBitString121, u128, 121);
 
-macro_rules! impl_from {
-    ($from:ty, $into:ident, $into_t:ty) => {
-        impl From<$from> for $into {
-            fn from(item: $from) -> $into {
-                const SHIFT: usize = <$into>::MAX_LEN - <$from>::MAX_LEN;
-                $into(
-                    (((item.0 as $into_t) << SHIFT) & Self::LEN_MASK) |
-                    ((item.0 & <$from>::BITS_MASK) as $into_t)
-                )
+macro_rules! impl_compact_bitstring8 {
+    ($name:ident) => {
+        impl BitString8 for $name {
+            fn push_u8_back(&mut self, byte: u8) {
+                let len = self.len();
+                let new_bits = (self.bits() << 8) | (byte as Self::BitsType);
+                *self = Self::new(len + 8, new_bits);
+            }
+
+            fn push_u8_front(&mut self, byte: u8) {
+                let len = self.len();
+                let new_bits = ((byte as Self::BitsType) << len) | self.bits();
+                *self = Self::new(len + 8, new_bits);
+            }
+
+            fn pop_u8_back(&mut self) -> u8 {
+                let result = self.0 as u8;
+                let len = self.len();
+                let new_bits = self.bits() >> 8;
+                *self = Self::new(len - 8, new_bits);
+                result
+            }
+
+            fn pop_u8_front(&mut self) -> u8 {
+                let new_len = self.len() - 8;
+                let result = (self.0 >> new_len) as u8;
+                let new_bits = self.bits() & ((1 << new_len) - 1);
+                *self = Self::new(new_len, new_bits);
+                result
             }
         }
     };
 }
 
-impl_from!(CompactBitString5, CompactBitString12, u16);
-impl_from!(CompactBitString5, CompactBitString27, u32);
-impl_from!(CompactBitString5, CompactBitString58, u64);
-impl_from!(CompactBitString5, CompactBitString121, u128);
-impl_from!(CompactBitString12, CompactBitString27, u32);
-impl_from!(CompactBitString12, CompactBitString58, u64);
-impl_from!(CompactBitString12, CompactBitString121, u128);
-impl_from!(CompactBitString27, CompactBitString58, u64);
-impl_from!(CompactBitString27, CompactBitString121, u128);
-impl_from!(CompactBitString58, CompactBitString121, u128);
+impl_compact_bitstring8!(CompactBitString12);
+impl_compact_bitstring8!(CompactBitString27);
+impl_compact_bitstring8!(CompactBitString58);
+impl_compact_bitstring8!(CompactBitString121);
 
 mod tests {
-    #![allow(unused_imports, overflowing_literals)]
+    #![allow(unused_imports, overflowing_literals, non_snake_case)]
     use super::*;
 
-    macro_rules! impl_tests {
-        ($tname:ident, $name:ident, $type:ty, $len:expr) => {
-            #[test]
-            fn $tname() {
-                let mut b = $name::new();
-                assert_eq!(b.len(), 0);
-                assert_eq!(b.bits(), 0);
-                b.push_bit(1);
-                assert_eq!(b.len(), 1);
-                assert_eq!(b.bits(), 1);
-                b.push_bit_front(0);
-                assert_eq!(b.len(), 2);
-                assert_eq!(b.bits(), 1);
-                b.push_bit(1);
-                assert_eq!(b.len(), 3);
-                assert_eq!(b.bits(), 3);
-                b.push_bit(0);
-                assert_eq!(b.len(), 4);
-                assert_eq!(b.bits(), 6);
-
-                let mut b2 = $name::new();
-                b2.append(b);
-                assert_eq!(b2.len(), 4);
-                assert_eq!(b2.bits(), 6);
-                assert_eq!(b, b2);
-
-                
-
-                if $len >= 8 {
-                    b2.prepend(b);
-                    assert_eq!(b2.len(), 8);
-                    assert_eq!(b2.bits(), 0b01100110);
-                    b2.append(b);
-                    assert_eq!(b2.len(), 12);
-                    assert_eq!(b2.bits(), 0b011001100110);
-                }
-
-                let old_len = b2.len();
-                assert_eq!(b2.pop_bit(), 0);
-                assert_eq!(b2.len(), old_len - 1);
-                assert_eq!(b2.pop_bit_front(), 0);
-                assert_eq!(b2.len(), old_len - 2);
-                assert_eq!(b2.pop_bit_front(), 1);
-                assert_eq!(b2.len(), old_len - 3);
-                assert_eq!(b2.pop_bit(), 1);
-                assert_eq!(b2.len(), old_len - 4);
-            }
-        };
-    }
-    
-    impl_tests!(test_bitstring5, CompactBitString5, u8, 5);
-    impl_tests!(test_bitstring12, CompactBitString12, u16, 12);
-    impl_tests!(test_bitstring27, CompactBitString27, u32, 27);
-    impl_tests!(test_bitstring58, CompactBitString58, u64, 58);
-    impl_tests!(test_bitstring121, CompactBitString121, u128, 121);
-
     #[test]
-    fn a_few_more_tests() {
-        let mut bits = 0x102030405060708090a0b0c0d0e0f0;
-        let mut b = CompactBitString121::from_len_and_bits(120, bits);
-        assert_eq!(b.len(), 120);
-        assert_eq!(b.bits(), bits);
+    fn test_CompactBitString5() {
+        let mut bs = CompactBitString5::new(0, 0);
+        assert_eq!(bs.len(), 0);
+        assert_eq!(bs.bits(), 0);
 
-        for i in 0..120 {
-            let bit = (bits & 1) as u8;
-            assert_eq!(b.pop_bit(), bit);
-            bits >>= 1;
-            assert_eq!(b.len(), 119 - i);
-            assert_eq!(b.bits(), bits);
-        }
+        bs.push_bit_back(1);
+        assert_eq!(bs.len(), 1);
+        assert_eq!(bs.bits(), 0b1);
+
+        bs.push_bit_front(0);
+        assert_eq!(bs.len(), 2);
+        assert_eq!(bs.bits(), 0b01);
+
+        bs.push_bit_front(1);
+        assert_eq!(bs.len(), 3);
+        assert_eq!(bs.bits(), 0b101);
+
+        bs.push_bit_back(1);
+        assert_eq!(bs.len(), 4);
+        assert_eq!(bs.bits(), 0b1011);
+
+        bs.push_bit_front(0);
+        assert_eq!(bs.len(), 5);
+        assert_eq!(bs.bits(), 0b01011);
+
+        assert_eq!(bs.pop_bit_back(), 1);
+        assert_eq!(bs.len(), 4);
+        assert_eq!(bs.bits(), 0b0101);
+
+        assert_eq!(bs.pop_bit_front(), 0);
+        assert_eq!(bs.len(), 3);
+        assert_eq!(bs.bits(), 0b101);
+
+        assert_eq!(bs.pop_bit_front(), 1);
+        assert_eq!(bs.len(), 2);
+        assert_eq!(bs.bits(), 0b01);
+        
+        assert_eq!(bs.pop_bit_back(), 1);
+        assert_eq!(bs.len(), 1);
+        assert_eq!(bs.bits(), 0b0);
+
+        assert_eq!(bs.pop_bit_back(), 0);
+        assert_eq!(bs.len(), 0);
+        assert_eq!(bs.bits(), 0);
+
+        bs.push_bit_back(1);
+        bs.push_bit_back(0);
+        assert_eq!(bs.len(), 2);
+        assert_eq!(bs.bits(), 0b10);
+
+        let x = bs;
+        bs.append(x);
+        assert_eq!(bs.len(), 4);
+        assert_eq!(bs.bits(), 0b1010);
+
+        bs.clear();
+        assert_eq!(bs.len(), 0);
+        assert_eq!(bs.bits(), 0);
+
+        bs.push_bit_back(1);
+        bs.prepend(x);
+        assert_eq!(bs.len(), 3);
+        assert_eq!(bs.bits(), 0b101);
+
+        bs.prepend(x);
+        assert_eq!(bs.len(), 5);
+        assert_eq!(bs.bits(), 0b10101);
     }
 }

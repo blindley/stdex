@@ -1,5 +1,8 @@
 use std::io::{self, Read, Write};
 
+mod bitio;
+pub use self::bitio::{BitReader, BitWriter};
+
 unsafe fn as_u8_slice<T>(data: &T) -> &[u8] {
     let ptr = data as *const T as *const u8;
     let len = std::mem::size_of::<T>();
@@ -26,6 +29,14 @@ fn write_item<T, W: Write>(writer: &mut W, item: T) -> io::Result<()> {
         let data = as_u8_slice(&item);
         writer.write_all(data)
     }
+}
+
+pub fn read_u8(reader: &mut impl Read) -> io::Result<u8> {
+    read_item::<u8,_>(reader)
+}
+
+pub fn write_u8(reader: &mut impl Write, item: u8) -> io::Result<()> {
+    write_item(reader, item)
 }
 
 macro_rules! impl_endian_readers {

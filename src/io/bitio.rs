@@ -128,6 +128,39 @@ impl<R: Read> BitReader<R> {
         self.buffer = 0;
         self.mask = 0x80;
     }
+
+    /// Returns a reference to the underlying `Read` object.
+    /// 
+    /// Any partially read bytes will not be accessible through the reference.
+    pub fn as_read(&self) -> &R {
+        &self.reader
+    }
+
+    /// Returns a mutable reference to the underlying `Read` object.
+    /// 
+    /// Any partially read bytes will not be accessible through the reference.
+    /// If you partially read a byte, and then use the `Read` interface to
+    /// read one or more bytes, when you go back to the BitReader, you will
+    /// first read the unfinished byte, and then skip to after the last byte
+    /// read from the `Read` object.
+    /// 
+    /// # Example
+    /// ```
+    /// # use stdex::io::BitReader;
+    /// # use stdex::io::read_u8;
+    /// let cursor = std::io::Cursor::new([0xab, 0xcd, 0xef]);
+    /// let mut bitreader = BitReader::new(cursor);
+    /// 
+    /// assert_eq!(bitreader.read_bits_32(4).ok(), Some(0xa));
+    /// {
+    ///     let reader = bitreader.as_read_mut();
+    ///     assert_eq!(read_u8(reader).ok(), Some(0xcd));
+    /// }
+    /// assert_eq!(bitreader.read_bits_32(12).ok(), Some(0xbef));
+    /// ```
+    pub fn as_read_mut(&mut self) -> &mut R {
+        &mut self.reader
+    }
 }
 
 mod bitreader_tests {
@@ -344,6 +377,40 @@ impl<W: Write> BitWriter<W> {
             self.write_bit(fill_bit)?;
         }
         Ok(())
+    }
+
+    /// Returns a reference to the underlying `Write` object.
+    /// 
+    /// Partially written bytes will not be output to the stream and remain
+    /// in the buffer.
+    pub fn as_write(&self) -> &W {
+        &self.writer
+    }
+
+    /// Returns a reference to the underlying `Write` object.
+    /// 
+    /// Partially written bytes will not be output to the stream and remain
+    /// in the buffer.
+    /// 
+    /// # Example
+    /// ```
+    /// # use stdex::io::BitWriter;
+    /// # use stdex::io::write_u8;
+    /// # use std::io::Write;
+    /// let mut output: Vec<u8> = Vec::new();
+    /// {
+    ///     let mut bitwriter = BitWriter::new(output.by_ref());
+    ///     bitwriter.write_bits_32(0xa, 4).unwrap();
+    ///     {
+    ///         let writer = bitwriter.as_write_mut();
+    ///         write_u8(writer, 0xbc).unwrap();
+    ///     }
+    ///     bitwriter.write_bits_32(0xd, 4).unwrap();
+    /// }
+    /// assert_eq!(output, vec![0xbc, 0xad]);
+    /// ```
+    pub fn as_write_mut(&mut self) -> &mut W {
+        &mut self.writer
     }
 }
 

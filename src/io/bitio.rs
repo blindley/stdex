@@ -3,6 +3,7 @@ use crate::io::{read_u8, write_u8};
 
 type Bit = u8;
 
+/// Adapts an input stream to read one or more bits at a time
 pub struct BitReader<R: Read> {
     reader: R,
     buffer: u32,
@@ -18,6 +19,18 @@ impl<R: Read> BitReader<R> {
         }
     }
 
+    /// Reads a single bit from the stream
+    /// 
+    /// # Example
+    /// ```
+    /// # use stdex::io::BitReader;
+    /// let buffer = std::io::Cursor::new([0b10101010]);
+    /// let mut bitreader = BitReader::new(buffer);
+    /// for i in 0..4 {
+    ///     assert_eq!(bitreader.read_bit().ok(), Some(1));
+    ///     assert_eq!(bitreader.read_bit().ok(), Some(0));
+    /// }
+    /// ```
     pub fn read_bit(&mut self) -> io::Result<Bit> {
         if self.mask == 0x80 {
             self.buffer = read_u8(&mut self.reader)? as u32;
@@ -36,6 +49,21 @@ impl<R: Read> BitReader<R> {
         Ok(result)
     }
 
+    /// Reads up to 32 bits from the stream
+    /// 
+    /// # Example
+    /// ```
+    /// # use stdex::io::BitReader;
+    /// let buffer = std::io::Cursor::new([0xab, 0xcd, 0xef]);
+    /// let mut bitreader = BitReader::new(buffer);
+    /// 
+    /// assert_eq!(bitreader.read_bits_32(4).ok(), Some(0xa));
+    /// assert_eq!(bitreader.read_bits_32(8).ok(), Some(0xbc));
+    /// assert_eq!(bitreader.read_bits_32(12).ok(), Some(0xdef))
+    /// ```
+    /// 
+    /// # Panic
+    /// Panics if `count > 32`.
     pub fn read_bits_32(&mut self, mut count: usize) -> io::Result<u32> {
         assert!(count <= 32);
         let mut result = 0;
@@ -75,6 +103,23 @@ impl<R: Read> BitReader<R> {
         }
 
         Ok(result)
+    }
+
+    /// Discards any remaining bits of a partially read byte
+    /// 
+    /// # Example
+    /// ```
+    /// # use stdex::io::BitReader;
+    /// let cursor = std::io::Cursor::new([0xab, 0xcd]);
+    /// let mut bitreader = BitReader::new(cursor);
+    /// 
+    /// assert_eq!(bitreader.read_bits_32(4).ok(), Some(0xa));
+    /// bitreader.flush_byte();
+    /// assert_eq!(bitreader.read_bits_32(4).ok(), Some(0xc));
+    /// ```
+    pub fn flush_byte(&mut self) {
+        self.buffer = 0;
+        self.mask = 0x80;
     }
 }
 
@@ -168,6 +213,7 @@ mod bitreader_tests {
     }
 }
 
+/// Adapts an output stream to write one or more bits at a time
 pub struct BitWriter<W: Write> {
     writer: W,
     buffer: u32,
@@ -183,6 +229,24 @@ impl<W: Write> BitWriter<W> {
         }
     }
 
+    /// Writes a single bit to the stream.
+    /// 
+    /// If `bit == 0`, writes a 0, otherwise writes a 1.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// # use stdex::io::BitWriter;
+    /// # use std::io::Write;
+    /// let mut output: Vec<u8> = Vec::new();
+    /// {
+    ///     let mut bitwriter = BitWriter::new(output.by_ref());
+    ///     for i in 0..24 {
+    ///         bitwriter.write_bit(i % 3).unwrap();
+    ///     }
+    /// }
+    /// assert_eq!(output, vec![0b01101101, 0b10110110, 0b11011011]);
+    /// ```
     pub fn write_bit(&mut self, bit: Bit) -> io::Result<()> {
         if bit != 0 {
             self.buffer |= self.mask;
@@ -198,7 +262,26 @@ impl<W: Write> BitWriter<W> {
         Ok(())
     }
 
-    pub fn write_bits_32(&mut self, mut value: u32, mut count: usize)
+    /// Writes up to 32 bits to the stream.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// # use stdex::io::BitWriter;
+    /// # use std::io::Write;
+    /// let mut output: Vec<u8> = Vec::new();
+    /// {
+    ///     let mut bitwriter = BitWriter::new(output.by_ref());
+    ///     bitwriter.write_bits_32(0xabc, 12).unwrap();
+    ///     bitwriter.write_bits_32(0xd, 4).unwrap();
+    /// }
+    /// assert_eq!(output, vec![0xab, 0xcd]);
+    /// ```
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if `count > 32`.
+    pub fn write_bits_32(&mut self, value: u32, mut count: usize)
     -> io::Result<()> {
         assert!(count <= 32);
         if count == 0 {
@@ -245,6 +328,10 @@ impl<W: Write> BitWriter<W> {
         Ok(())
     }
 
+    /// Finishes writing any partially written byte.
+    /// 
+    /// Fills in remaining bits with `fill_bit`. If there are no partially
+    /// written bytes, does nothing.
     pub fn finish_byte(&mut self, fill_bit: Bit) -> io::Result<()> {
         while self.mask != 0x80 {
             self.write_bit(fill_bit)?;
@@ -294,7 +381,7 @@ mod bitwriter_tests {
                 );
             }
             
-            writer.finish_byte(0);
+            assert_eq!(writer.finish_byte(0).ok(), Some(()));
         }
 
         {

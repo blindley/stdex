@@ -4,6 +4,9 @@ use crate::io::{read_u8, write_u8};
 type Bit = u8;
 
 /// Adapts an input stream to read one or more bits at a time
+/// 
+/// Bits are read starting from the most significant bit of each successive
+/// byte.
 pub struct BitReader<R: Read> {
     reader: R,
     buffer: u32,
@@ -50,6 +53,10 @@ impl<R: Read> BitReader<R> {
     }
 
     /// Reads up to 32 bits from the stream
+    /// 
+    /// Bits are placed in the lower portion of the resulting u32, with
+    /// the first bits being placed in the most significant position.
+    /// So if you read 9 bits you will get a value less than 512.
     /// 
     /// # Example
     /// ```

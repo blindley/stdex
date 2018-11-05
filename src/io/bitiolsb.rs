@@ -164,6 +164,13 @@ impl<R: Read> BitReaderLSB<R> {
     pub fn as_read_mut(&mut self) -> &mut R {
         &mut self.reader
     }
+
+    /// Drops self and returns the underlying `Read` object.
+    /// 
+    /// Any remaining bits of partially read bytes will be lost.
+    pub fn into_read(self) -> R {
+        self.reader
+    }
 }
 
 mod bitreaderlsb_tests {
@@ -348,6 +355,14 @@ impl<W: Write> BitWriterLSB<W> {
     /// ```
     pub fn as_write_mut(&mut self) -> &mut W {
         &mut self.writer
+    }
+
+    /// Drops self and returns the underlying `Write` object
+    /// 
+    /// Partially written bytes will not be output to the stream and will
+    /// be lost.
+    pub fn into_write(self) -> W {
+        self.writer
     }
 }
 

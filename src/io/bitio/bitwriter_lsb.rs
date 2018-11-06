@@ -60,9 +60,10 @@ impl<W: Write> BitWriterLSB<W> {
     /// `remaining_bits()` to check if there are any.
     pub fn into_write(mut self) -> W {
         use crate::io::BitWrite;
-        assert_eq!(self.remaining_bits(), 0);
+        assert_eq!(self.remaining_bits(), 0, "bits remaining in BitWriter before dropping");
         unsafe {
             let writer = std::mem::replace(&mut self.writer, std::mem::uninitialized());
+            std::mem::forget(self);
             writer
         }
     }
@@ -198,7 +199,7 @@ impl<W: Write> crate::io::BitWrite for BitWriterLSB<W> {
 impl<W: Write> Drop for BitWriterLSB<W> {
     fn drop(&mut self) {
         use crate::io::BitWrite;
-        assert_eq!(self.remaining_bits(), 0);
+        assert_eq!(self.remaining_bits(), 0, "bits remaining in BitWriter before dropping");
     }
 }
 

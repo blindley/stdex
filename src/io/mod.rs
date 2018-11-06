@@ -1,10 +1,11 @@
 use std::io::{self, Read, Write};
 
 mod bitio;
-pub use self::bitio::{BitReader, BitWriter};
-
-mod bitiolsb;
-pub use self::bitiolsb::{BitReaderLSB, BitWriterLSB};
+pub use self::bitio::{
+    BitRead, BitWrite,
+    BitReaderMSB, BitWriterMSB,
+    BitReaderLSB, BitWriterLSB
+};
 
 unsafe fn as_u8_slice<T>(data: &T) -> &[u8] {
     let ptr = data as *const T as *const u8;

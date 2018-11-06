@@ -33,4 +33,7 @@ pub trait BitWrite {
 
     /// Finishes writing any partially written byte.
     fn finish_byte(&mut self, fill_bit: Bit) -> std::io::Result<()>;
+
+    /// Returns the number of bits left in any partially written byte.
+    fn remaining_bits(&self) -> u8;
 }

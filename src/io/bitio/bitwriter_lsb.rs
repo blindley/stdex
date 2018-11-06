@@ -55,10 +55,16 @@ impl<W: Write> BitWriterLSB<W> {
 
     /// Drops self and returns the underlying `Write` object
     /// 
-    /// Partially written bytes will not be output to the stream and will
-    /// be lost.
-    pub fn into_write(self) -> W {
-        self.writer
+    /// # Panics
+    /// Panics if any partially written bytes are left in the buffer. Call
+    /// `remaining_bits()` to check if there are any.
+    pub fn into_write(mut self) -> W {
+        use crate::io::BitWrite;
+        assert_eq!(self.remaining_bits(), 0);
+        unsafe {
+            let writer = std::mem::replace(&mut self.writer, std::mem::uninitialized());
+            writer
+        }
     }
 }
 
@@ -172,6 +178,27 @@ impl<W: Write> crate::io::BitWrite for BitWriterLSB<W> {
             self.write_bit(fill_bit)?;
         }
         Ok(())
+    }
+
+    fn remaining_bits(&self) -> u8 {
+        match self.mask {
+            0x1 => 0,
+            0x2 => 7,
+            0x4 => 6,
+            0x8 => 5,
+            0x10 => 4,
+            0x20 => 3,
+            0x40 => 2,
+            0x80 => 1,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<W: Write> Drop for BitWriterLSB<W> {
+    fn drop(&mut self) {
+        use crate::io::BitWrite;
+        assert_eq!(self.remaining_bits(), 0);
     }
 }
 

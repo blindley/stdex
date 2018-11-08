@@ -9,6 +9,7 @@ struct Codes {
     distance: Vec<Code<u16>>,
 }
 
+/// Decompresses a block of data that was compressed by the DEFLATE algorithm.
 pub fn inflate<R: Read>(reader: &mut R, output: &mut Vec<u8>) -> BoxResult<()> {
     let mut bitreader = BitReaderLSB::new(reader);
     loop {

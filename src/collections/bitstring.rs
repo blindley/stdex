@@ -2,6 +2,7 @@ pub trait BitString {
     const MAX_LEN: usize;
     type BitsType;
     fn new(len: usize, bits: Self::BitsType) -> Self;
+    fn new_from_u32(len: usize, bits: u32) -> Self;
     fn len(&self) -> usize;
     fn bits(&self) -> Self::BitsType;
     fn push_bit_back(&mut self, bit: u8);
@@ -31,6 +32,9 @@ macro_rules! impl_compact_bitstring {
             type BitsType = $base;
             fn new(len: usize, bits: Self::BitsType) -> Self {
                 $name(((len as Self::BitsType) << Self::MAX_LEN) | (bits & ((1 << len) - 1)))
+            }
+            fn new_from_u32(len: usize, bits: u32) -> Self {
+                $name::new(len, bits as Self::BitsType)
             }
             fn len(&self) -> usize { (self.0 >> Self::MAX_LEN) as usize }
             fn bits(&self) -> Self::BitsType { self.0 & ((1 << Self::MAX_LEN) - 1) }

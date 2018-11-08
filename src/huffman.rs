@@ -1,7 +1,8 @@
 use crate::collections::BitString;
 use crate::error::{error_if, SimpleResult};
 use crate::Increment;
-use crate::collections::CompactBitString27 as CodeString;
+
+pub type CodeString = crate::collections::CompactBitString27;
 
 
 #[derive(Debug, Clone)]

@@ -1,3 +1,5 @@
+pub type BoxResult<T> = Result<T, Box<std::error::Error>>;
+
 #[derive(Debug, Clone)]
 pub struct SimpleError {
     message: String

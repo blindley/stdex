@@ -19,6 +19,12 @@ impl std::fmt::Display for SimpleError {
 
 impl std::error::Error for SimpleError {}
 
+impl From<SimpleError> for std::io::Error {
+    fn from(e: SimpleError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, e)
+    }
+}
+
 pub type SimpleResult<T> = Result<T, SimpleError>;
 
 pub fn error_if(value: bool, message: impl Into<String>)

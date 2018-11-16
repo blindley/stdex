@@ -7,6 +7,9 @@ pub use self::bitio::{
     BitReaderLSB, BitWriterLSB
 };
 
+mod deflate;
+pub use self::deflate::DeflateDecompressor;
+
 unsafe fn as_u8_slice<T>(data: &T) -> &[u8] {
     let ptr = data as *const T as *const u8;
     let len = std::mem::size_of::<T>();
